@@ -16,7 +16,8 @@ namespace Outside.DontPanic2UnitTests
         {
             const int firstElevator = 10;
             const int secondElevator = 20;
-            var floor = new Floor(1, firstElevator);
+            var floor = new Floor(1, 0);
+            floor.Elevators.Add(firstElevator);
             floor.Elevators.Add(secondElevator);
 
             var closestElevatorTo = floor.ClosestElevatorTo(clonePos);

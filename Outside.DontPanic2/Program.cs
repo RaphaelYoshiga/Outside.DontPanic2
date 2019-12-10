@@ -35,18 +35,20 @@ class Player
                 Console.WriteLine("WAIT");
                 continue;
             }
+            var closestElevatorTo = floor.ClosestElevatorTo(clonePos);
 
-            if (floor.ElevatorPos < 0 && _numberElevatorsToBuild > 0)
+            if (closestElevatorTo < 0 && _numberElevatorsToBuild > 0)
             {
                 BuildElevator(floor, clonePos);
                 continue;
             }
 
-            var closestElevatorTo = floor.ClosestElevatorTo(clonePos);
-            var correctDirection = clonePos - closestElevatorTo <= 0 ? "RIGHT" : "LEFT";
-            Console.Error.WriteLine($"Clone: {clonePos} at floor: {cloneFloor}, {floor.ElevatorPos}, {correctDirection}");
-            var cloneGoingToRightDirection = direction == correctDirection || clonePos == floor.ElevatorPos;
-            Console.WriteLine(cloneGoingToRightDirection ? "WAIT" : "BLOCK");
+            var correctDirection = clonePos - closestElevatorTo < 0 ? "RIGHT" : "LEFT";
+            Console.Error.WriteLine($"Clone X: {clonePos} at floor: {cloneFloor}, {closestElevatorTo}, {correctDirection}");
+            var cloneGoingToRightDirection = direction == correctDirection || clonePos == closestElevatorTo;
+            var format = cloneGoingToRightDirection ? "WAIT" : "BLOCK";
+            Console.Error.WriteLine(format);
+            Console.WriteLine(format);
         }
     }
 
@@ -54,6 +56,13 @@ class Player
     {
         int nbFloors = int.Parse(inputs[0]); // number of floors
         int width = int.Parse(inputs[1]); // width of the area
+
+        _floors = new Floors();
+        for (int i = 0; i < nbFloors; i++)
+        {
+            _floors.Add(i, new Floor(i, width));
+        }
+
         int nbRounds = int.Parse(inputs[2]); // maximum number of rounds
         _exitFloor = int.Parse(inputs[3]);
         _exitPos = int.Parse(inputs[4]);
@@ -68,14 +77,7 @@ class Player
             int elevatorFloor = int.Parse(inputs[0]); // floor on which this elevator is found
             int elevatorPos = int.Parse(inputs[1]); // position of the elevator on its floor
 
-            if (_floors.ContainsKey(elevatorFloor))
-            {
-                _floors[elevatorFloor].Elevators.Add(elevatorPos);
-            }
-            else
-            {
-                _floors.Add(elevatorFloor, new Floor(elevatorFloor, elevatorPos));
-            }
+            _floors[elevatorFloor].Elevators.Add(elevatorPos);
         }
     }
 
@@ -84,8 +86,8 @@ class Player
         Console.WriteLine("ELEVATOR");
         _numberElevatorsToBuild--;
 
-        floor.ElevatorPos = clonePos;
-        Console.Error.WriteLine($"Floor: {floor.ElevatorFloor}");
+        floor.Elevators.Add(clonePos);
+        Console.Error.WriteLine($"Floor: {floor.Y}");
     }
 
     private static Floor GetFloor(int cloneFloor)
@@ -108,21 +110,27 @@ internal class Floors : Dictionary<int, Floor>
 
 public class Floor
 {
-    public int ElevatorFloor { get; }
-    public int ElevatorPos { get; set; }
 
+    public int Y { get; }
+    public int MaxX { get; set; }
     public List<int> Elevators { get; set; } = new List<int>();
 
-    public Floor(int elevatorFloor, int elevatorPos)
+    public Floor(int y, int maxX)
     {
-        ElevatorFloor = elevatorFloor;
-        ElevatorPos = elevatorPos;
+        Y = y;
+        MaxX = maxX;
+    }
 
-        Elevators.Add(elevatorPos);
+    public Floor(int y)
+    {
+        Y = y;
     }
 
     public int ClosestElevatorTo(int clonePos)
     {
+        if (!Elevators.Any())
+            return -1;
+
         return Elevators.OrderBy(elevator => GetDistance(clonePos, elevator))
             .First();
     }
