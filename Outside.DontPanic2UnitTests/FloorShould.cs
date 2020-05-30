@@ -8,7 +8,6 @@ namespace Outside.DontPanic2UnitTests
     {
         [Theory]
         [InlineData(11, 10)]
-        [InlineData(15, 10)]
         [InlineData(16, 20)]
         [InlineData(20, 20)]
         [InlineData(21, 20)]
@@ -20,7 +19,7 @@ namespace Outside.DontPanic2UnitTests
             floor.Elevators.Add(firstElevator);
             floor.Elevators.Add(secondElevator);
 
-            var closestElevatorTo = floor.ClosestElevatorTo(clonePos);
+            var closestElevatorTo = floor.ClosestElevatorTo(clonePos, Direction.Right);
 
             closestElevatorTo.ShouldBe(expectedElevator);
         }
