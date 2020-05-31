@@ -4,6 +4,7 @@ using System.IO;
 using System.Text;
 using System.Collections;
 using System.Collections.Generic;
+using System.Runtime.InteropServices.WindowsRuntime;
 
 /**
  * Auto-generated code below aims at helping you parse
@@ -79,11 +80,13 @@ public struct MapReturn
 {
     public int TotalTravel { get; }
     public Direction Direction { get; }
+    public bool ShouldBuild { get; }
 
-    public MapReturn(int totalTravel, Direction direction)
+    public MapReturn(int totalTravel, Direction direction, bool shouldBuild = false)
     {
         TotalTravel = totalTravel;
         Direction = direction;
+        ShouldBuild = shouldBuild;
     }
 }
 
@@ -104,40 +107,89 @@ public class Game
 
     public string TakeDecision(int cloneFloor, int clonePos, Direction direction)
     {
-        var floor = GetFloor(cloneFloor);
         if (clonePos == -1)
+        {
             return "WAIT";
+        }
+        var floor = _floors[cloneFloor];
+        if (floor.Elevators.Any(p => p == clonePos))
+        {
+            Console.Error.WriteLine("Llll");
+            return "WAIT";
+        }
 
-        var closestElevatorTo = floor.ClosestElevatorTo(clonePos, direction);
-        if (closestElevatorTo < 0 && _elevatorsToBuild > 0)
+        Console.Error.WriteLine($"Clone Floor: {cloneFloor}");
+        if (_elevatorsToBuild > 0 && !floor.Elevators.Any())
+        {
+            Console.Error.WriteLine($"Built From not any elevator");
+            return BuildElevator(floor, clonePos);
+        }
+            
+
+        var shortPath = ShortPath(cloneFloor, clonePos, direction, _elevatorsToBuild);
+        if (shortPath.ShouldBuild)
             return BuildElevator(floor, clonePos);
 
-        var shortPath = ShortPath(cloneFloor, clonePos, direction);
-        var cloneGoingToRightDirection = direction == shortPath.Direction || clonePos == closestElevatorTo;
+        var cloneGoingToRightDirection = direction == shortPath.Direction;
         return cloneGoingToRightDirection ? "WAIT" : "BLOCK";
     }
 
-    private MapReturn ShortPath(int cloneFloor, int clonePos, Direction direction)
+    private MapReturn ShortPath(int cloneFloor, int clonePos, Direction direction, int elevatorsToBuild)
     {
         var exitFloor = _floors[cloneFloor];
         var elevators = exitFloor.ElevatorsByDirection(clonePos, direction);
         if (cloneFloor == _exitFloor)
         {
-            var returnDirection = _exitPosition > clonePos ? Direction.Right : Direction.Left;
-            var distance = exitFloor.GetDistance(clonePos, _exitPosition, direction);
-            return new MapReturn(distance, returnDirection);
+            return HandleLastFloor(clonePos, direction, elevators);
         }
 
-        var left = CalculateFor(cloneFloor, elevators.ClosestLeft, Direction.Left);
-        var right = CalculateFor(cloneFloor, elevators.ClosestRight, Direction.Right);
+        var left = CalculateFor(cloneFloor, elevators.ClosestLeft, Direction.Left, elevatorsToBuild);
+        var right = CalculateFor(cloneFloor, elevators.ClosestRight, Direction.Right, elevatorsToBuild);
+        var elevator = ElevatorTotalTravel(cloneFloor, clonePos, direction, elevatorsToBuild);
 
-        if (left < right)
+        if (left <= right && left <= elevator)
             return new MapReturn(left, Direction.Left);
+        if(right <= elevator)
+            return new MapReturn(right, Direction.Right);
 
-        return new MapReturn(right, Direction.Right);
+        return new MapReturn(elevator, direction, true);
     }
 
-    private int CalculateFor(int cloneFloor, ClosestElevator elevator, Direction direction)
+    private int ElevatorTotalTravel(int cloneFloor, int clonePos, Direction direction, int elevatorsToBuild)
+    {
+        if (elevatorsToBuild > 0)
+        {
+            var totalTravel = ShortPath(cloneFloor + 1, clonePos, direction, elevatorsToBuild - 1).TotalTravel;
+            if(totalTravel == int.MaxValue)
+                return int.MaxValue;
+
+            return 1 + totalTravel;
+        }
+
+        return int.MaxValue;
+    }
+
+    private MapReturn HandleLastFloor(int clonePos, Direction direction, ElevatorReturn elevators)
+    {
+        if (clonePos == _exitPosition)
+            return new MapReturn(0, direction);
+
+        var returnDirection = _exitPosition > clonePos ? Direction.Right : Direction.Left;
+        if (returnDirection == Direction.Right)
+        {
+            if(elevators.ClosestRight != null && elevators.ClosestRight.Position  < _exitPosition )
+                return new MapReturn(int.MaxValue, returnDirection);
+
+            return new MapReturn(_floors[_exitFloor].GetDistance(clonePos, _exitPosition, direction), returnDirection);
+        }
+
+        if (elevators.ClosestLeft != null &&  elevators.ClosestLeft.Position > _exitPosition)
+            return new MapReturn(int.MaxValue, returnDirection);
+
+        return new MapReturn(_floors[_exitFloor].GetDistance(clonePos, _exitPosition, direction), returnDirection);
+    }
+
+    private int CalculateFor(int cloneFloor, ClosestElevator elevator, Direction direction, int elevatorsToBuild)
     {
         if (elevator == null)
             return int.MaxValue;
@@ -145,7 +197,10 @@ public class Game
         if (cloneFloor == _exitFloor)
             return elevator.Distance;
 
-        var totalTravel = ShortPath(cloneFloor + 1, elevator.Position, direction).TotalTravel;
+        var totalTravel = ShortPath(cloneFloor + 1, elevator.Position, direction, elevatorsToBuild).TotalTravel;
+        if (totalTravel == int.MaxValue)
+            return totalTravel;
+
         return elevator.Distance + totalTravel;
     }
 
@@ -154,20 +209,8 @@ public class Game
     {
         _elevatorsToBuild--;
         floor.Elevators.Add(clonePos);
+        Console.Error.WriteLine($"Built elevator at: {floor.Y}, pos: {clonePos}");
         return "ELEVATOR";
-    }
-
-    private Floor GetFloor(int cloneFloor)
-    {
-        if (cloneFloor == _exitFloor)
-            return new Floor(_exitFloor, _exitPosition);
-
-        if (_floors.ContainsKey(cloneFloor))
-            return _floors[cloneFloor];
-
-        var newFloor = new Floor(cloneFloor, -1);
-        _floors.Add(cloneFloor, newFloor);
-        return newFloor;
     }
 
     public void SetGeneralProperties(int nbRounds, int nbTotalClones)
@@ -217,13 +260,9 @@ public class Floor
         var elevatorsReturn = new ElevatorReturn();
         var lookup = Elevators.ToLookup(p => p > clonePos ? Direction.Right : Direction.Left, x => new ClosestElevator(x, clonePos, direction));
         if (lookup.Contains(Direction.Right))
-        {
             elevatorsReturn.ClosestRight = lookup[Direction.Right].OrderBy(p => p.Distance).First();
-        }
         if (lookup.Contains(Direction.Left))
-        {
             elevatorsReturn.ClosestLeft = lookup[Direction.Left].OrderBy(p => p.Distance).First();
-        }
 
         return elevatorsReturn;
     }
