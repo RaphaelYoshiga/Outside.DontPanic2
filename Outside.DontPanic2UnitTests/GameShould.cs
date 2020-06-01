@@ -26,6 +26,28 @@ namespace Outside.DontPanic2UnitTests
         }
 
         [Fact]
+        public void ChooseToBlockForAnotherElevator()
+        {
+            var floors = new Floors()
+            {
+                {0, new Floor(0, 3)},
+                {1, new Floor(1) },
+                {2, new Floor(2)  }
+            };
+            var game = new Game(floors, 2, 3, 1);
+            game.SetGeneralProperties(100, 10);
+
+            var decision = game.TakeDecision(new Clone(0, 2, Direction.Right));
+            decision.ShouldBe("WAIT");
+
+            decision = game.TakeDecision(new Clone(0, 3, Direction.Right));
+            decision.ShouldBe("WAIT");
+
+            decision = game.TakeDecision(new Clone(0, 3, Direction.Right));
+            decision.ShouldBe("WAIT");
+        }
+
+        [Fact]
         public void OnlyBuildInRightFloors()
         {
             var floors = new Floors()
@@ -98,10 +120,10 @@ namespace Outside.DontPanic2UnitTests
             decision.ShouldBe("WAIT");
 
             decision = game.TakeDecision(new Clone(1, 4, Direction.Right));
-            decision.ShouldBe("BLOCK");
-
-            decision = game.TakeDecision(new Clone(1, 3, Direction.Left));
             decision.ShouldBe("ELEVATOR");
+
+            decision = game.TakeDecision(new Clone(2, 4, Direction.Right));
+            decision.ShouldBe("BLOCK");
 
             decision = game.TakeDecision(new Clone(2, 3, Direction.Left));
             decision.ShouldBe("WAIT");
