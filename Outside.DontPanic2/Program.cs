@@ -118,15 +118,12 @@ public class Game
             return "WAIT";
         }
 
-        if (_elevatorsToBuild > 0 && !floor.Elevators.Any())
-        {
-            return BuildElevator(floor, clonePos);
-        }
-            
-
         var shortPath = ShortPath(cloneFloor, clonePos, direction, _elevatorsToBuild, _nbTotalClones);
         if (shortPath.ShouldBuild)
+        {
+            Console.Error.WriteLine($"Should build, {shortPath.TotalTravel}");
             return BuildElevator(floor, clonePos);
+        }
 
         var cloneGoingToRightDirection = direction == shortPath.Direction;
         return cloneGoingToRightDirection ? "WAIT" : "BLOCK";
@@ -143,12 +140,14 @@ public class Game
             return new MapReturn(int.MaxValue, direction);
 
         var floor = _floors[cloneFloor];
+        if (floor.Elevators.Any(p => p == clonePos))
+            return ShortPath(cloneFloor + 1, clonePos, direction, elevatorsToBuild, nbTotalClones);
+        
         var elevators = floor.ElevatorsByDirection(clonePos, direction);
         if (cloneFloor == _exitFloor)
         {
             return HandleLastFloor(clonePos, direction, elevators);
         }
-
 
         var left = CalculateFor(cloneFloor, elevators.ClosestLeft, Direction.Left, elevatorsToBuild, nbTotalClones);
         var right = CalculateFor(cloneFloor, elevators.ClosestRight, Direction.Right, elevatorsToBuild, nbTotalClones);
@@ -160,16 +159,27 @@ public class Game
             elevator == int.MaxValue
             && elevatorsToBuild > 0)
         {
-            var distance = floor.GetDistance(clonePos, _exitPosition, direction);
-            return new MapReturn(distance, Direction.Left);
+            return AvoidTrap(clonePos, direction, floor);
         }
 
         if (left <= right && left <= elevator)
             return new MapReturn(left, Direction.Left);
         if(right <= elevator)
             return new MapReturn(right, Direction.Right);
+        if (elevator < int.MaxValue)
+        {
+            return new MapReturn(elevator, direction, true);
+        }
 
-        return new MapReturn(elevator, direction, true);
+        return AvoidTrap(clonePos, direction, floor);
+    }
+
+    private MapReturn AvoidTrap(int clonePos, Direction direction, Floor floor)
+    {
+        Console.Error.WriteLine("AVOIDING TRAP!");
+        var distance = floor.GetDistance(clonePos, _exitPosition, direction);
+        var elevatorDirection = _exitPosition > clonePos ? Direction.Right : Direction.Left;
+        return new MapReturn(distance, elevatorDirection);
     }
 
     private int ElevatorTotalTravel(int cloneFloor, int clonePos, Direction direction, int elevatorsToBuild,

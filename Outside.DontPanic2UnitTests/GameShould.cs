@@ -145,10 +145,13 @@ namespace Outside.DontPanic2UnitTests
                 {4, new Floor(3) }
             };
 
-            var game = new Game(floors, 4, 3, 1);
+            var game = new Game(floors, 4, 3, 4);
             game.SetGeneralProperties(100, 10);
 
             var decision = game.TakeDecision(0, 3, Direction.Left);
+            decision.ShouldBe("ELEVATOR");
+
+            decision = game.TakeDecision(1, 3, Direction.Left);
             decision.ShouldBe("ELEVATOR");
         }
 
