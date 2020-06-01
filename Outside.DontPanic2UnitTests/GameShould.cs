@@ -18,6 +18,7 @@ namespace Outside.DontPanic2UnitTests
                 {2, new Floor(2, 3)  }
             };
             var game = new Game(floors, 2, 3, 0);
+            game.SetGeneralProperties(100, 10);
 
             var decision = game.TakeDecision(0, 3, Direction.Left);
 
@@ -34,6 +35,7 @@ namespace Outside.DontPanic2UnitTests
                 {2, new Floor(2,6)  }
             };
             var game = new Game(floors, 2, 6, 1);
+            game.SetGeneralProperties(100, 10);
 
             var decision = game.TakeDecision(0, 3, Direction.Right);
             decision.ShouldBe("WAIT");
@@ -57,6 +59,7 @@ namespace Outside.DontPanic2UnitTests
                 {4, new Floor(4,6)  }
             };
             var game = new Game(floors, 4, 6, 2);
+            game.SetGeneralProperties(100, 10);
 
             var decision = game.TakeDecision(0, 3, Direction.Right);
             decision.ShouldBe("WAIT");
@@ -86,6 +89,7 @@ namespace Outside.DontPanic2UnitTests
                 {4, new Floor(4)  }
             };
             var game = new Game(floors, 4, 6, 2);
+            game.SetGeneralProperties(100, 10);
 
             var decision = game.TakeDecision(0, 3, Direction.Right);
             decision.ShouldBe("WAIT");
@@ -122,6 +126,7 @@ namespace Outside.DontPanic2UnitTests
                 {2, new Floor(2, 3)  }
             };
             var game = new Game(floors, 1, 3, 1);
+            game.SetGeneralProperties(100, 10);
 
             var decision = game.TakeDecision(0, 3, Direction.Left);
 
@@ -141,10 +146,37 @@ namespace Outside.DontPanic2UnitTests
             };
 
             var game = new Game(floors, 4, 3, 1);
-            
+            game.SetGeneralProperties(100, 10);
+
             var decision = game.TakeDecision(0, 3, Direction.Left);
             decision.ShouldBe("ELEVATOR");
         }
+
+        [Fact]
+        public void HandleTrap()
+        {
+            var floors = new Floors()
+            {
+                {0, new Floor(0, 1) },
+                {1, new Floor(3) }
+            };
+
+            var game = new Game(floors, 1, 0, 1);
+            game.SetGeneralProperties(100, 10);
+            
+            var decision = game.TakeDecision(0, 3, Direction.Left);
+            decision.ShouldBe("WAIT");
+
+            decision = game.TakeDecision(0, 2, Direction.Left);
+            decision.ShouldBe("WAIT");
+
+            decision = game.TakeDecision(0, 1, Direction.Left);
+            decision.ShouldBe("WAIT");
+
+            decision = game.TakeDecision(0, 0, Direction.Left);
+            decision.ShouldBe("ELEVATOR");
+        }
+
 
         [Fact]
         public void ChooseToWait()
@@ -156,6 +188,7 @@ namespace Outside.DontPanic2UnitTests
                 {2, new Floor(2, 3)  }
             };
             var game = new Game(floors, 2, 3, 0);
+            game.SetGeneralProperties(100, 10);
 
             var decision = game.TakeDecision(0, 3, Direction.Right);
 
@@ -170,6 +203,7 @@ namespace Outside.DontPanic2UnitTests
                 {0, new Floor(0)},
             };
             var game = new Game(floors, 0, 1, 0);
+            game.SetGeneralProperties(100, 10);
 
             var decision = game.TakeDecision(0, 3, Direction.Right);
 

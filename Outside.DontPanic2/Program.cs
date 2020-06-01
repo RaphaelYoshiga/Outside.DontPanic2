@@ -96,6 +96,7 @@ public class Game
     private readonly int _exitFloor;
     private readonly int _exitPosition;
     private int _elevatorsToBuild;
+    private int _nbTotalClones;
 
     public Game(Floors floors, int exitFloor, int exitPosition, int elevatorsToBuild)
     {
@@ -114,19 +115,16 @@ public class Game
         var floor = _floors[cloneFloor];
         if (floor.Elevators.Any(p => p == clonePos))
         {
-            Console.Error.WriteLine("Llll");
             return "WAIT";
         }
 
-        Console.Error.WriteLine($"Clone Floor: {cloneFloor}");
         if (_elevatorsToBuild > 0 && !floor.Elevators.Any())
         {
-            Console.Error.WriteLine($"Built From not any elevator");
             return BuildElevator(floor, clonePos);
         }
             
 
-        var shortPath = ShortPath(cloneFloor, clonePos, direction, _elevatorsToBuild);
+        var shortPath = ShortPath(cloneFloor, clonePos, direction, _elevatorsToBuild, _nbTotalClones);
         if (shortPath.ShouldBuild)
             return BuildElevator(floor, clonePos);
 
@@ -134,18 +132,37 @@ public class Game
         return cloneGoingToRightDirection ? "WAIT" : "BLOCK";
     }
 
-    private MapReturn ShortPath(int cloneFloor, int clonePos, Direction direction, int elevatorsToBuild)
+    private MapReturn ShortPath(
+        int cloneFloor,
+        int clonePos,
+        Direction direction,
+        int elevatorsToBuild,
+        int nbTotalClones)
     {
-        var exitFloor = _floors[cloneFloor];
-        var elevators = exitFloor.ElevatorsByDirection(clonePos, direction);
+        if (nbTotalClones < 0 || cloneFloor > _exitFloor)
+            return new MapReturn(int.MaxValue, direction);
+
+        var floor = _floors[cloneFloor];
+        var elevators = floor.ElevatorsByDirection(clonePos, direction);
         if (cloneFloor == _exitFloor)
         {
             return HandleLastFloor(clonePos, direction, elevators);
         }
 
-        var left = CalculateFor(cloneFloor, elevators.ClosestLeft, Direction.Left, elevatorsToBuild);
-        var right = CalculateFor(cloneFloor, elevators.ClosestRight, Direction.Right, elevatorsToBuild);
-        var elevator = ElevatorTotalTravel(cloneFloor, clonePos, direction, elevatorsToBuild);
+
+        var left = CalculateFor(cloneFloor, elevators.ClosestLeft, Direction.Left, elevatorsToBuild, nbTotalClones);
+        var right = CalculateFor(cloneFloor, elevators.ClosestRight, Direction.Right, elevatorsToBuild, nbTotalClones);
+        var elevator = ElevatorTotalTravel(cloneFloor, clonePos, direction, elevatorsToBuild, nbTotalClones);
+
+        if (_exitFloor - 1 == cloneFloor && 
+            left == int.MaxValue &&
+            right == int.MaxValue &&
+            elevator == int.MaxValue
+            && elevatorsToBuild > 0)
+        {
+            var distance = floor.GetDistance(clonePos, _exitPosition, direction);
+            return new MapReturn(distance, Direction.Left);
+        }
 
         if (left <= right && left <= elevator)
             return new MapReturn(left, Direction.Left);
@@ -155,11 +172,12 @@ public class Game
         return new MapReturn(elevator, direction, true);
     }
 
-    private int ElevatorTotalTravel(int cloneFloor, int clonePos, Direction direction, int elevatorsToBuild)
+    private int ElevatorTotalTravel(int cloneFloor, int clonePos, Direction direction, int elevatorsToBuild,
+        int nbTotalClones)
     {
         if (elevatorsToBuild > 0)
         {
-            var totalTravel = ShortPath(cloneFloor + 1, clonePos, direction, elevatorsToBuild - 1).TotalTravel;
+            var totalTravel = ShortPath(cloneFloor + 1, clonePos, direction, elevatorsToBuild - 1, nbTotalClones - 1).TotalTravel;
             if(totalTravel == int.MaxValue)
                 return int.MaxValue;
 
@@ -180,16 +198,19 @@ public class Game
             if(elevators.ClosestRight != null && elevators.ClosestRight.Position  < _exitPosition )
                 return new MapReturn(int.MaxValue, returnDirection);
 
-            return new MapReturn(_floors[_exitFloor].GetDistance(clonePos, _exitPosition, direction), returnDirection);
+            var totalTravel = _floors[_exitFloor].GetDistance(clonePos, _exitPosition, direction);
+            return new MapReturn(totalTravel, returnDirection);
         }
 
         if (elevators.ClosestLeft != null &&  elevators.ClosestLeft.Position > _exitPosition)
             return new MapReturn(int.MaxValue, returnDirection);
 
-        return new MapReturn(_floors[_exitFloor].GetDistance(clonePos, _exitPosition, direction), returnDirection);
+        var distance = _floors[_exitFloor].GetDistance(clonePos, _exitPosition, direction);
+        return new MapReturn(distance, returnDirection);
     }
 
-    private int CalculateFor(int cloneFloor, ClosestElevator elevator, Direction direction, int elevatorsToBuild)
+    private int CalculateFor(int cloneFloor, ClosestElevator elevator, Direction direction, int elevatorsToBuild,
+        int nbTotalClones)
     {
         if (elevator == null)
             return int.MaxValue;
@@ -197,7 +218,12 @@ public class Game
         if (cloneFloor == _exitFloor)
             return elevator.Distance;
 
-        var totalTravel = ShortPath(cloneFloor + 1, elevator.Position, direction, elevatorsToBuild).TotalTravel;
+        if (!elevator.IsCloneGoingToRightDirection)
+        {
+            nbTotalClones--;
+        }
+
+        var totalTravel = ShortPath(cloneFloor + 1, elevator.Position, direction, elevatorsToBuild, nbTotalClones).TotalTravel;
         if (totalTravel == int.MaxValue)
             return totalTravel;
 
@@ -215,6 +241,7 @@ public class Game
 
     public void SetGeneralProperties(int nbRounds, int nbTotalClones)
     {
+        _nbTotalClones = nbTotalClones;
     }
 }
 
@@ -230,23 +257,27 @@ public class ElevatorReturn
 
 public class ClosestElevator
 {
+
     public ClosestElevator(int position, int clonePosition, Direction direction)
     {
         Position = position;
         Distance = GetDistance(clonePosition, position, direction);
     }
+
     private int GetDistance(int clonePos, int elevator, Direction direction)
     {
         var elevatorDirection = clonePos - elevator < 0 ? Direction.Right : Direction.Left;
-        var isCloneGoingToRightDirection = elevatorDirection == direction;
+        IsCloneGoingToRightDirection = elevatorDirection == direction;
 
         var abs = Math.Abs(elevator - clonePos);
-        return isCloneGoingToRightDirection ? abs : abs + 3;
+        return IsCloneGoingToRightDirection ? abs : abs + 3;
     }
 
     public int Position { get; }
 
     public int Distance { get; }
+    public bool IsCloneGoingToRightDirection { get; private set; }
+
 }
 
 public class Floor
@@ -274,20 +305,10 @@ public class Floor
         Elevators.AddRange(elevatorPos);
     }
 
-    public int ClosestElevatorTo(int clonePos, Direction direction)
-    {
-        if (!Elevators.Any())
-            return -1;
-
-        return Elevators.OrderBy(elevator => GetDistance(clonePos, elevator, direction))
-            .First();
-    }
-
     public int GetDistance(int clonePos, int elevator, Direction direction)
     {
         var elevatorDirection = clonePos - elevator < 0 ? Direction.Right : Direction.Left;
         var isCloneGoingToRightDirection = elevatorDirection == direction;
-
         var distance = elevator - clonePos;
         var abs = Math.Abs(distance);
         return isCloneGoingToRightDirection ? abs : abs + 3;
