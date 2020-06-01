@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Text;
 using Shouldly;
 using Xunit;
@@ -13,9 +14,9 @@ namespace Outside.DontPanic2UnitTests
         {
             var floors = new Floors()
             {
-                {0, new Floor(0, 1, 7)},
-                {1, new Floor(1, 6) },
-                {2, new Floor(2, 3)  }
+                {0, new Floor(1, 7)},
+                {1, new Floor(6)},
+                {2, new Floor(3)}
             };
             var game = new Game(floors, 2, 3, 0);
             game.SetGeneralProperties(100, 10);
@@ -30,9 +31,9 @@ namespace Outside.DontPanic2UnitTests
         {
             var floors = new Floors()
             {
-                {0, new Floor(0, 3)},
-                {1, new Floor(1) },
-                {2, new Floor(2)  }
+                {0, new Floor(3)},
+                {1, new Floor()},
+                {2, new Floor()}
             };
             var game = new Game(floors, 2, 3, 1);
             game.SetGeneralProperties(100, 10);
@@ -52,9 +53,9 @@ namespace Outside.DontPanic2UnitTests
         {
             var floors = new Floors()
             {
-                {0, new Floor(0, 4)},
-                {1, new Floor(1) },
-                {2, new Floor(2,6)  }
+                {0, new Floor(4)},
+                {1, new Floor()},
+                {2, new Floor(6)}
             };
             var game = new Game(floors, 2, 6, 1);
             game.SetGeneralProperties(100, 10);
@@ -74,11 +75,11 @@ namespace Outside.DontPanic2UnitTests
         {
             var floors = new Floors()
             {
-                {0, new Floor(0, 4)},
-                {1, new Floor(1) },
-                {2, new Floor(2) },
-                {3, new Floor(3,6)  },
-                {4, new Floor(4)  }
+                {0, new Floor(4)},
+                {1, new Floor()},
+                {2, new Floor()},
+                {3, new Floor(6)},
+                {4, new Floor()}
             };
             var game = new Game(floors, 4, 6, 2);
             game.SetGeneralProperties(100, 10);
@@ -104,11 +105,11 @@ namespace Outside.DontPanic2UnitTests
         {
             var floors = new Floors()
             {
-                {0, new Floor(0, 4)},
-                {1, new Floor(1) },
-                {2, new Floor(2, 3) },
-                {3, new Floor(3)  },
-                {4, new Floor(4)  }
+                {0, new Floor(4)},
+                {1, new Floor()},
+                {2, new Floor(3)},
+                {3, new Floor()},
+                {4, new Floor()}
             };
             var game = new Game(floors, 4, 6, 2);
             game.SetGeneralProperties(100, 10);
@@ -140,9 +141,9 @@ namespace Outside.DontPanic2UnitTests
         {
             var floors = new Floors()
             {
-                {0, new Floor(0, 1, 7)},
-                {1, new Floor(1, 6) },
-                {2, new Floor(2, 3)  }
+                {0, new Floor(1, 7)},
+                {1, new Floor(6)},
+                {2, new Floor(3)}
             };
             var game = new Game(floors, 1, 3, 1);
             game.SetGeneralProperties(100, 10);
@@ -157,11 +158,11 @@ namespace Outside.DontPanic2UnitTests
         {
             var floors = new Floors()
             {
-                {0, new Floor(0) },
-                {1, new Floor(1) },
-                {2, new Floor(2) },
-                {3, new Floor(3) },
-                {4, new Floor(3) }
+                {0, new Floor()},
+                {1, new Floor()},
+                {2, new Floor()},
+                {3, new Floor()},
+                {4, new Floor()}
             };
 
             var game = new Game(floors, 4, 3, 4);
@@ -179,13 +180,13 @@ namespace Outside.DontPanic2UnitTests
         {
             var floors = new Floors()
             {
-                {0, new Floor(0, 1) },
-                {1, new Floor(3) }
+                {0, new Floor(1)},
+                {1, new Floor()}
             };
 
             var game = new Game(floors, 1, 0, 1);
             game.SetGeneralProperties(100, 10);
-            
+
             var decision = game.TakeDecision(new Clone(0, 3, Direction.Left));
             decision.ShouldBe("WAIT");
 
@@ -205,9 +206,9 @@ namespace Outside.DontPanic2UnitTests
         {
             var floors = new Floors()
             {
-                {0, new Floor(0, 1, 7)},
-                {1, new Floor(1, 6) },
-                {2, new Floor(2, 3)  }
+                {0, new Floor(1, 7)},
+                {1, new Floor(6)},
+                {2, new Floor(3)}
             };
             var game = new Game(floors, 2, 3, 0);
             game.SetGeneralProperties(100, 10);
@@ -222,7 +223,7 @@ namespace Outside.DontPanic2UnitTests
         {
             var floors = new Floors()
             {
-                {0, new Floor(0)},
+                {0, new Floor()},
             };
             var game = new Game(floors, 0, 1, 0);
             game.SetGeneralProperties(100, 10);
@@ -230,6 +231,32 @@ namespace Outside.DontPanic2UnitTests
             var decision = game.TakeDecision(new Clone(0, 3, Direction.Right));
 
             decision.ShouldBe("BLOCK");
+        }
+
+        [Fact]
+        public void PerformanceTest()
+        {
+            var floors = new Floors();
+            var random = new Random();
+
+            var rows = 12;
+            var columns = 24/*68*/;
+
+            for (int i = 0; i <= rows; i++)
+            {
+                floors.Add(i, new Floor(random.Next(0, columns)));
+            }
+
+            var game = new Game(floors, rows, columns, 10);
+            game.SetGeneralProperties(1000, 100, rows);
+            floors.InitializeScanResults(columns);
+
+            var sw = new Stopwatch();
+            sw.Start();
+            game.TakeDecision(new Clone(0, 0, Direction.Right));
+            sw.Stop();
+
+            sw.ElapsedMilliseconds.ShouldBeLessThan(100);
         }
     }
 }

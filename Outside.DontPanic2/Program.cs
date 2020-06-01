@@ -55,15 +55,16 @@ class Player
             if (floors.ContainsKey(elevatorFloor))
                 floors[elevatorFloor].Elevators.Add(elevatorPos);
             else
-                floors.Add(elevatorFloor, new Floor(elevatorFloor, elevatorPos));
+                floors.Add(elevatorFloor, new Floor(elevatorPos));
         }
 
         for (int i = 0; i <= nbFloors; i++)
         {
             if (!floors.ContainsKey(i))
-                floors[i] = new Floor(i);
+                floors[i] = new Floor();
         }
 
+        floors.InitializeScanResults(width);
         _game = new Game(floors, exitFloor, exitPos, numberElevatorsToBuild);
         _game.SetGeneralProperties(nbRounds, nbTotalClones, width);
     }
@@ -77,7 +78,6 @@ public class Game
     private int _elevatorsToBuild;
     private int _nbTotalClones;
     public int _maxWidth;
-    private readonly Dictionary<string, MapReturn> _pathCaching = new Dictionary<string, MapReturn>();
     private readonly ElevatorStrategy _elevatorStrategy;
 
     public Game(Floors floors, int exitFloor, int exitPosition, int elevatorsToBuild)
@@ -91,9 +91,7 @@ public class Game
 
     public string TakeDecision(Clone clone)
     {
-        _pathCaching.Clear();
-        //Console.Error.WriteLine($"Input: {clone.CloneFloor} {clone.ClonePos} {clone.Direction} alive = {_nbTotalClones}, el = {_elevatorsToBuild}");
-        if (clone.ClonePos == -1 || _floors[clone.CloneFloor].Elevators.Any(p => p == clone.ClonePos))
+        if (clone.ClonePos == -1 || _floors[clone.CloneFloor].ContainsElevatorAt(clone.ClonePos))
         {
             return "WAIT";
         }
@@ -104,7 +102,6 @@ public class Game
 
         if (shortPath.ShouldBuild)
         {
-            _pathCaching.Clear();
             return BuildElevator(floor, clone.ClonePos);
         }
 
@@ -112,30 +109,32 @@ public class Game
         return cloneGoingToRightDirection ? "WAIT" : "BLOCK";
     }
 
-    public MapReturn ShortPath(SimulationParameters simulationParameters, bool root = false)
+    public MapReturn ShortPath(SimulationParameters parameters, bool root = false)
     {
-        var key = simulationParameters.CacheKey();
-        if (_pathCaching.ContainsKey(key))
-            return _pathCaching[key];
+        if (parameters.NbTotalClones < 0 || parameters.CloneFloor > _exitFloor)
+            return new MapReturn(int.MaxValue, parameters.Direction);
 
-        if (simulationParameters.NbTotalClones < 0 || simulationParameters.CloneFloor > _exitFloor)
-            return new MapReturn(int.MaxValue, simulationParameters.Direction);
+        var floor = _floors[parameters.CloneFloor];
+        var scanResult = floor.ScanResults[parameters.ClonePos];
+        if (scanResult.IsBetterThan(parameters))
+            return new MapReturn(int.MaxValue, Direction.Right);
 
-        var floor = _floors[simulationParameters.CloneFloor];
-        var elevators = floor.ElevatorsByDirection(simulationParameters.ClonePos, simulationParameters.Direction);
-        if (floor.Elevators.Any(p => p == simulationParameters.ClonePos))
-            return WaitForElevator(simulationParameters);
+        scanResult.Update(parameters);
 
-        if (simulationParameters.CloneFloor == _exitFloor)
+        if (floor.ContainsElevatorAt(parameters.ClonePos))
+            return WaitForElevator(parameters);
+        
+        var elevators = floor.ElevatorsByDirection(parameters.ClonePos, parameters.Direction);
+        if (parameters.CloneFloor == _exitFloor)
         {
-            return HandleLastFloor(simulationParameters, elevators);
+            return HandleLastFloor(parameters, elevators);
         }
 
-        var left = new MapReturn(CalculateFor(simulationParameters, elevators.ClosestLeft, Direction.Left), Direction.Left);
-        var right = new MapReturn(CalculateFor(simulationParameters, elevators.ClosestRight, Direction.Right), Direction.Right);
+        var left = new MapReturn(CalculateFor(parameters, elevators.ClosestLeft, Direction.Left), Direction.Left);
+        var right = new MapReturn(CalculateFor(parameters, elevators.ClosestRight, Direction.Right), Direction.Right);
 
-        var elevatorReturns = _elevatorStrategy.GetMasterElevators(simulationParameters, elevators);
-        var shortPath = MinOf(elevatorReturns, left, right);
+        var elevatorReturns = _elevatorStrategy.GetMasterElevators(parameters, elevators);
+        var mapReturn = MinOf(elevatorReturns, left, right);
 
         //if (root)
         //{
@@ -146,15 +145,15 @@ public class Game
         //        Console.Error.WriteLine($"elevator = {e.Format()}");
         //    }
         //}
-        _pathCaching.Add(key, shortPath);
-        return shortPath;
+        return mapReturn;
         
     }
 
     private MapReturn WaitForElevator(SimulationParameters simulationParameters)
     {
-        var path = ShortPath(simulationParameters.AboveSimulation());
-        return new MapReturn(1 + path.TotalTravel, path.Direction);
+        var cost = 1;
+        var path = ShortPath(simulationParameters.AboveSimulation(cost));
+        return new MapReturn(cost + path.TotalTravel, path.Direction);
     }
 
     private MapReturn MinOf(List<MapReturn> elevators, params MapReturn[] returns)
@@ -199,7 +198,7 @@ public class Game
         if (elevator == null)
             return int.MaxValue;
 
-        var aboveWithWrongDirection = simulationParameters.AboveWithDirection(elevator, direction, elevator.IsCloneGoingToRightDirection);
+        var aboveWithWrongDirection = simulationParameters.AboveWithDirection(elevator, direction);
         var totalTravel = ShortPath(aboveWithWrongDirection).TotalTravel;
         if (totalTravel == int.MaxValue)
             return totalTravel;
@@ -257,8 +256,8 @@ public class ElevatorStrategy
         var newParams = simulationParameters.WrongDirectionHandle(simulationParameters.Direction == Direction.Left);
         for (int i = simulationParameters.ClonePos - 1; i >= maxRight; i--)
         {
-            var cloneAt = newParams.CloneAt(i);
             var distance = Floor.GetDistance(simulationParameters.ClonePos, i, simulationParameters.Direction);
+            var cloneAt = newParams.CloneAt(i, distance);
             var elevatorTotalTravel = distance + ElevatorTotalTravel(cloneAt);
 
             var x = new MapReturn(elevatorTotalTravel, Direction.Left);
@@ -276,7 +275,7 @@ public class ElevatorStrategy
         for (int i = simulationParameters.ClonePos + 1; i <= maxRight; i++)
         {
             var distance = Floor.GetDistance(simulationParameters.ClonePos, i, simulationParameters.Direction);
-            var cloneAt = newParams.CloneAt(i);
+            var cloneAt = newParams.CloneAt(i, distance);
             var pathDistance = i + ElevatorTotalTravel(cloneAt) + distance;
             var x = new MapReturn(pathDistance, simulationParameters.Direction);
             results.Add(x);
@@ -285,16 +284,28 @@ public class ElevatorStrategy
 
     private int ElevatorTotalTravel(SimulationParameters simulationParameters)
     {
-        var newParameters = simulationParameters.ElevatorBuilt();
+        var cost = 3;
+        var newParameters = simulationParameters.ElevatorBuilt(cost);
         var totalTravel = _game.ShortPath(newParameters).TotalTravel;
         if (totalTravel == int.MaxValue)
             return int.MaxValue;
 
-        return 3 + totalTravel;
+        
+        return cost + totalTravel;
     }
 }
 public class Floors : Dictionary<int, Floor>
 {
+    public void InitializeScanResults(int width)
+    {
+        foreach (var item in this)
+        {
+            for (int i = 0; i <= width; i++)
+            {
+                item.Value.ScanResults[i] = new ScanResult(new SimulationParameters(item.Key, i, Direction.Right, 0, 0, int.MaxValue));
+            }
+        }
+    }
 }
 
 public class ElevatorReturn
@@ -328,8 +339,8 @@ public class ClosestElevator
 
 public class Floor
 {
-    public List<int> Elevators { get; set; } = new List<int>();
-
+    public HashSet<int> Elevators { get; set; } = new HashSet<int>();
+    public Dictionary<int, ScanResult> ScanResults { get; set; } =new Dictionary<int, ScanResult>();
     public ElevatorReturn ElevatorsByDirection(int clonePos, Direction direction)
     {
         var elevatorsReturn = new ElevatorReturn();
@@ -342,9 +353,12 @@ public class Floor
         return elevatorsReturn;
     }
 
-    public Floor(int y, params int[] elevatorPos)
+    public Floor(params int[] elevatorPos)
     {
-        Elevators.AddRange(elevatorPos);
+        foreach (var elevator in elevatorPos)
+        {
+            Elevators.Add(elevator);
+        }
     }
 
     public static int GetDistance(int clonePos, int position, Direction direction)
@@ -355,18 +369,24 @@ public class Floor
         var abs = Math.Abs(distance);
         return isCloneGoingToRightDirection ? abs : abs + 3;
     }
+
+    public bool ContainsElevatorAt(int index)
+    {
+        return Elevators.Contains(index);
+    }
 }
 
 
 public class SimulationParameters
 {
-    public SimulationParameters(int cloneFloor, int clonePos, Direction direction, int elevatorsToBuild, int nbTotalClones)
+    public SimulationParameters(int cloneFloor, int clonePos, Direction direction, int elevatorsToBuild, int nbTotalClones, int cost)
     {
         CloneFloor = cloneFloor;
         ClonePos = clonePos;
         Direction = direction;
         ElevatorsToBuild = elevatorsToBuild;
         NbTotalClones = nbTotalClones;
+        Cost = cost;
     }
 
     public SimulationParameters(Clone clone, int elevatorsToBuild, int nbTotalClones)
@@ -376,28 +396,30 @@ public class SimulationParameters
         Direction = clone.Direction;
         ElevatorsToBuild = elevatorsToBuild;
         NbTotalClones = nbTotalClones;
+        Cost = 0;
     }
 
 
-    public int CloneFloor { get; private set; }
-    public int ClonePos { get; private set; }
-    public Direction Direction { get; private set; }
-    public int ElevatorsToBuild { get; private set; }
-    public int NbTotalClones { get; private set; }
+    public int CloneFloor { get;}
+    public int ClonePos { get; }
+    public Direction Direction { get; }
+    public int ElevatorsToBuild { get; }
+    public int NbTotalClones { get; }
+    public int Cost { get; }
 
-    public SimulationParameters ElevatorBuilt()
+    public SimulationParameters ElevatorBuilt(int cost)
     {
-        return new SimulationParameters(CloneFloor + 1, ClonePos, Direction, ElevatorsToBuild - 1, NbTotalClones - 1);
+        return new SimulationParameters(CloneFloor + 1, ClonePos, Direction, ElevatorsToBuild - 1, NbTotalClones - 1, Cost + cost);
     }
 
-    public SimulationParameters AboveSimulation()
+    public SimulationParameters AboveSimulation(int cost)
     {
-        return new SimulationParameters(CloneFloor + 1, ClonePos, Direction, ElevatorsToBuild, NbTotalClones);
+        return new SimulationParameters(CloneFloor + 1, ClonePos, Direction, ElevatorsToBuild, NbTotalClones, Cost + cost);
     }
 
-    public SimulationParameters CloneAt(int newPosition)
+    public SimulationParameters CloneAt(int newPosition, int distance = 0)
     {
-        return new SimulationParameters(CloneFloor, newPosition, Direction, ElevatorsToBuild, NbTotalClones);
+        return new SimulationParameters(CloneFloor, newPosition, Direction, ElevatorsToBuild, NbTotalClones, Cost + distance);
     }
 
     public SimulationParameters WrongDirectionHandle(bool elevatorIsCloneGoingToRightDirection)
@@ -406,16 +428,16 @@ public class SimulationParameters
         if (!elevatorIsCloneGoingToRightDirection)
             totalClones--;
 
-        return new SimulationParameters(CloneFloor, ClonePos, Direction, ElevatorsToBuild, totalClones);
+        return new SimulationParameters(CloneFloor, ClonePos, Direction, ElevatorsToBuild, totalClones, Cost);
     }
 
-    public SimulationParameters AboveWithDirection(ClosestElevator elevator, Direction direction, bool elevatorIsCloneGoingToRightDirection)
+    public SimulationParameters AboveWithDirection(ClosestElevator elevator, Direction direction)
     {
         var totalClones = NbTotalClones;
-        if (!elevatorIsCloneGoingToRightDirection)
+        if (!elevator.IsCloneGoingToRightDirection)
             totalClones--;
 
-        return new SimulationParameters(CloneFloor + 1, elevator.Position, direction, ElevatorsToBuild, totalClones);
+        return new SimulationParameters(CloneFloor + 1, elevator.Position, direction, ElevatorsToBuild, totalClones, elevator.Distance);
     }
 
 
@@ -429,6 +451,34 @@ public enum Direction
 {
     Left,
     Right
+}
+
+public class ScanResult
+{
+    public ScanResult(SimulationParameters previousParams)
+    {
+        Cost = previousParams.Cost;
+        TotalClones = previousParams.NbTotalClones;
+        ElevatorsToBuild = previousParams.ElevatorsToBuild;
+    }
+
+    public int Cost { get; set; }
+    public int TotalClones { get; set; }
+    public int ElevatorsToBuild { get; set; }
+
+    public bool IsBetterThan(SimulationParameters parameters)
+    {
+        return Cost < parameters.Cost &&
+               TotalClones >= parameters.NbTotalClones &&
+               ElevatorsToBuild >= parameters.ElevatorsToBuild;
+    }
+
+    public void Update(SimulationParameters parameters)
+    {
+        Cost = parameters.Cost;
+        TotalClones = parameters.NbTotalClones;
+        ElevatorsToBuild = parameters.ElevatorsToBuild;
+    }
 }
 
 public struct MapReturn
