@@ -20,7 +20,7 @@ namespace Outside.DontPanic2UnitTests
             var game = new Game(floors, 2, 3, 0);
             game.SetGeneralProperties(100, 10);
 
-            var decision = game.TakeDecision(0, 3, Direction.Left);
+            var decision = game.TakeDecision(new Clone(0, 3, Direction.Left));
 
             decision.ShouldBe("BLOCK");
         }
@@ -37,13 +37,13 @@ namespace Outside.DontPanic2UnitTests
             var game = new Game(floors, 2, 6, 1);
             game.SetGeneralProperties(100, 10);
 
-            var decision = game.TakeDecision(0, 3, Direction.Right);
+            var decision = game.TakeDecision(new Clone(0, 3, Direction.Right));
             decision.ShouldBe("WAIT");
 
-            decision = game.TakeDecision(0, 4, Direction.Right);
+            decision = game.TakeDecision(new Clone(0, 4, Direction.Right));
             decision.ShouldBe("WAIT");
 
-            decision = game.TakeDecision(1, 4, Direction.Right);
+            decision = game.TakeDecision(new Clone(1, 4, Direction.Right));
             decision.ShouldBe("ELEVATOR");
         }
 
@@ -56,24 +56,24 @@ namespace Outside.DontPanic2UnitTests
                 {1, new Floor(1) },
                 {2, new Floor(2) },
                 {3, new Floor(3,6)  },
-                {4, new Floor(4,6)  }
+                {4, new Floor(4)  }
             };
             var game = new Game(floors, 4, 6, 2);
             game.SetGeneralProperties(100, 10);
 
-            var decision = game.TakeDecision(0, 3, Direction.Right);
+            var decision = game.TakeDecision(new Clone(0, 3, Direction.Right));
             decision.ShouldBe("WAIT");
 
-            decision = game.TakeDecision(0, 4, Direction.Right);
+            decision = game.TakeDecision(new Clone(0, 4, Direction.Right));
             decision.ShouldBe("WAIT");
 
-            decision = game.TakeDecision(1, 4, Direction.Right);
+            decision = game.TakeDecision(new Clone(1, 4, Direction.Right));
             decision.ShouldBe("ELEVATOR");
 
-            decision = game.TakeDecision(1, 4, Direction.Right);
+            decision = game.TakeDecision(new Clone(1, 4, Direction.Right));
             decision.ShouldBe("WAIT");
 
-            decision = game.TakeDecision(2, 4, Direction.Right);
+            decision = game.TakeDecision(new Clone(2, 4, Direction.Right));
             decision.ShouldBe("ELEVATOR");
         }
 
@@ -91,29 +91,26 @@ namespace Outside.DontPanic2UnitTests
             var game = new Game(floors, 4, 6, 2);
             game.SetGeneralProperties(100, 10);
 
-            var decision = game.TakeDecision(0, 3, Direction.Right);
+            var decision = game.TakeDecision(new Clone(0, 3, Direction.Right));
             decision.ShouldBe("WAIT");
 
-            decision = game.TakeDecision(0, 4, Direction.Right);
+            decision = game.TakeDecision(new Clone(0, 4, Direction.Right));
             decision.ShouldBe("WAIT");
 
-            decision = game.TakeDecision(1, 4, Direction.Right);
-            decision.ShouldBe("ELEVATOR");
-
-            decision = game.TakeDecision(1, 4, Direction.Right);
-            decision.ShouldBe("WAIT");
-
-            decision = game.TakeDecision(2, 4, Direction.Right);
+            decision = game.TakeDecision(new Clone(1, 4, Direction.Right));
             decision.ShouldBe("BLOCK");
 
-            decision = game.TakeDecision(2, 3, Direction.Right);
-            decision.ShouldBe("WAIT");
-
-            decision = game.TakeDecision(3, 3, Direction.Right);
+            decision = game.TakeDecision(new Clone(1, 3, Direction.Left));
             decision.ShouldBe("ELEVATOR");
 
-            decision = game.TakeDecision(3, 3, Direction.Right);
+            decision = game.TakeDecision(new Clone(2, 3, Direction.Left));
             decision.ShouldBe("WAIT");
+
+            decision = game.TakeDecision(new Clone(3, 3, Direction.Left));
+            decision.ShouldBe("ELEVATOR");
+
+            decision = game.TakeDecision(new Clone(4, 3, Direction.Left));
+            decision.ShouldBe("BLOCK");
         }
 
         [Fact]
@@ -128,7 +125,7 @@ namespace Outside.DontPanic2UnitTests
             var game = new Game(floors, 1, 3, 1);
             game.SetGeneralProperties(100, 10);
 
-            var decision = game.TakeDecision(0, 3, Direction.Left);
+            var decision = game.TakeDecision(new Clone(0, 3, Direction.Left));
 
             decision.ShouldBe("ELEVATOR");
         }
@@ -148,10 +145,10 @@ namespace Outside.DontPanic2UnitTests
             var game = new Game(floors, 4, 3, 4);
             game.SetGeneralProperties(100, 10);
 
-            var decision = game.TakeDecision(0, 3, Direction.Left);
+            var decision = game.TakeDecision(new Clone(0, 3, Direction.Left));
             decision.ShouldBe("ELEVATOR");
 
-            decision = game.TakeDecision(1, 3, Direction.Left);
+            decision = game.TakeDecision(new Clone(1, 3, Direction.Left));
             decision.ShouldBe("ELEVATOR");
         }
 
@@ -167,16 +164,16 @@ namespace Outside.DontPanic2UnitTests
             var game = new Game(floors, 1, 0, 1);
             game.SetGeneralProperties(100, 10);
             
-            var decision = game.TakeDecision(0, 3, Direction.Left);
+            var decision = game.TakeDecision(new Clone(0, 3, Direction.Left));
             decision.ShouldBe("WAIT");
 
-            decision = game.TakeDecision(0, 2, Direction.Left);
+            decision = game.TakeDecision(new Clone(0, 2, Direction.Left));
             decision.ShouldBe("WAIT");
 
-            decision = game.TakeDecision(0, 1, Direction.Left);
+            decision = game.TakeDecision(new Clone(0, 1, Direction.Left));
             decision.ShouldBe("WAIT");
 
-            decision = game.TakeDecision(0, 0, Direction.Left);
+            decision = game.TakeDecision(new Clone(0, 0, Direction.Left));
             decision.ShouldBe("ELEVATOR");
         }
 
@@ -193,7 +190,7 @@ namespace Outside.DontPanic2UnitTests
             var game = new Game(floors, 2, 3, 0);
             game.SetGeneralProperties(100, 10);
 
-            var decision = game.TakeDecision(0, 3, Direction.Right);
+            var decision = game.TakeDecision(new Clone(0, 3, Direction.Right));
 
             decision.ShouldBe("WAIT");
         }
@@ -208,7 +205,7 @@ namespace Outside.DontPanic2UnitTests
             var game = new Game(floors, 0, 1, 0);
             game.SetGeneralProperties(100, 10);
 
-            var decision = game.TakeDecision(0, 3, Direction.Right);
+            var decision = game.TakeDecision(new Clone(0, 3, Direction.Right));
 
             decision.ShouldBe("BLOCK");
         }
