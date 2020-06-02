@@ -134,8 +134,17 @@ public class Game
         var left = new MapReturn(CalculateFor(simulationParameters, elevators.ClosestLeft, Direction.Left), Direction.Left);
         var right = new MapReturn(CalculateFor(simulationParameters, elevators.ClosestRight, Direction.Right), Direction.Right);
 
-        var elevatorReturns = _elevatorStrategy.GetMasterElevators(simulationParameters, elevators);
-        var shortPath = MinOf(elevatorReturns, left, right);
+
+        var buildElevator = _elevatorStrategy.ScanBuildingElevator(simulationParameters.CloneAt(simulationParameters.ClonePos));
+        
+        var shortPath = MinOf(left, right, buildElevator);
+
+        if (shortPath.TotalTravel == int.MaxValue)
+        {
+            var elevatorReturns = _elevatorStrategy.GetMasterElevators(simulationParameters, elevators);
+            shortPath = MinOf(elevatorReturns.ToArray());
+
+        }
 
         //if (root)
         //{
@@ -157,10 +166,11 @@ public class Game
         return new MapReturn(1 + path.TotalTravel, path.Direction);
     }
 
-    private MapReturn MinOf(List<MapReturn> elevators, params MapReturn[] returns)
+    private MapReturn MinOf(params MapReturn[] returns)
     {
-        elevators.AddRange(returns);
-        return elevators.OrderBy(p => p.TotalTravel).ThenBy(p => p.ShouldBuild).First();
+        if(returns.Any())
+            return returns.OrderBy(p => p.TotalTravel).ThenBy(p => p.ShouldBuild).FirstOrDefault();
+        return MapReturn.Invalid;
     }
 
     private MapReturn HandleLastFloor(SimulationParameters simulationParameters, ElevatorReturn elevators)
@@ -239,10 +249,6 @@ public class ElevatorStrategy
         {
             AddRight(simulationParameters, elevators, results);
             AddLeft(simulationParameters, elevators, results);
-
-            var elevatorTotalTravel = ElevatorTotalTravel(simulationParameters.CloneAt(simulationParameters.ClonePos));
-            var elevator = new MapReturn(elevatorTotalTravel, Direction.Right, true);
-            results.Add(elevator);
         }
 
         return results;
@@ -291,6 +297,15 @@ public class ElevatorStrategy
             return int.MaxValue;
 
         return 3 + totalTravel;
+    }
+
+    public MapReturn ScanBuildingElevator(SimulationParameters parameters)
+    {
+        if (parameters.ElevatorsToBuild <= 0)
+            return MapReturn.Invalid;
+
+        var elevator = new MapReturn(ElevatorTotalTravel(parameters), Direction.Right, true);
+        return elevator;
     }
 }
 public class Floors : Dictionary<int, Floor>
@@ -436,6 +451,7 @@ public struct MapReturn
     public int TotalTravel { get; }
     public Direction Direction { get; }
     public bool ShouldBuild { get; }
+    public static MapReturn Invalid => new MapReturn(int.MaxValue, Direction.Left);
 
     public MapReturn(int totalTravel, Direction direction, bool shouldBuild = false)
     {

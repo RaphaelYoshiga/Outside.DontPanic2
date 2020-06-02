@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Text;
 using Shouldly;
 using Xunit;
@@ -230,6 +231,31 @@ namespace Outside.DontPanic2UnitTests
             var decision = game.TakeDecision(new Clone(0, 3, Direction.Right));
 
             decision.ShouldBe("BLOCK");
+        }
+
+        [Fact]
+        public void PerformanceTest()
+        {
+            var floors = new Floors();
+            var random = new Random();
+
+            var rows = 12;
+            var columns = 68/*68*/;
+
+            for (int i = 0; i <= rows; i++)
+            {
+                floors.Add(i, new Floor(random.Next(0, columns)));
+            }
+
+            var game = new Game(floors, rows, columns, 10);
+            game.SetGeneralProperties(1000, 100, rows);
+
+            var sw = new Stopwatch();
+            sw.Start();
+            game.TakeDecision(new Clone(0, 0, Direction.Right));
+            sw.Stop();
+
+            sw.ElapsedMilliseconds.ShouldBeLessThan(100);
         }
     }
 }
