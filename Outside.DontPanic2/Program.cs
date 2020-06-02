@@ -55,13 +55,13 @@ class Player
             if (floors.ContainsKey(elevatorFloor))
                 floors[elevatorFloor].Elevators.Add(elevatorPos);
             else
-                floors.Add(elevatorFloor, new Floor(elevatorFloor, elevatorPos));
+                floors.Add(elevatorFloor, new Floor(elevatorPos));
         }
 
         for (int i = 0; i <= nbFloors; i++)
         {
             if (!floors.ContainsKey(i))
-                floors[i] = new Floor(i);
+                floors[i] = new Floor();
         }
 
         _game = new Game(floors, exitFloor, exitPos, numberElevatorsToBuild);
@@ -146,15 +146,15 @@ public class Game
 
         }
 
-        //if (root)
-        //{
-        //    Console.Error.WriteLine($"left = {left.Format()}");
-        //    Console.Error.WriteLine($"right = {right.Format()}");
-        //    foreach (var e in elevatorReturns)
-        //    {
-        //        Console.Error.WriteLine($"elevator = {e.Format()}");
-        //    }
-        //}
+        if (root)
+        {
+            //Console.Error.WriteLine($"Health Total Clones = {_nbTotalClones}; TotalElevators = {_elevatorsToBuild}");
+            //Console.Error.WriteLine($"left = {left.Format()}");
+            //Console.Error.WriteLine($"right = {right.Format()}");
+            //Console.Error.WriteLine($"elevator! = {buildElevator.Format()}");
+            //Console.Error.WriteLine($"Returned! = {shortPath.Format()}");
+
+        }
         _pathCaching.Add(key, shortPath);
         return shortPath;
         
@@ -283,7 +283,7 @@ public class ElevatorStrategy
         {
             var distance = Floor.GetDistance(simulationParameters.ClonePos, i, simulationParameters.Direction);
             var cloneAt = newParams.CloneAt(i);
-            var pathDistance = i + ElevatorTotalTravel(cloneAt) + distance;
+            var pathDistance = ElevatorTotalTravel(cloneAt) + distance;
             var x = new MapReturn(pathDistance, simulationParameters.Direction);
             results.Add(x);
         }
@@ -304,7 +304,7 @@ public class ElevatorStrategy
         if (parameters.ElevatorsToBuild <= 0)
             return MapReturn.Invalid;
 
-        var elevator = new MapReturn(ElevatorTotalTravel(parameters), Direction.Right, true);
+        var elevator = new MapReturn(ElevatorTotalTravel(parameters), parameters.Direction, true);
         return elevator;
     }
 }
@@ -357,7 +357,7 @@ public class Floor
         return elevatorsReturn;
     }
 
-    public Floor(int y, params int[] elevatorPos)
+    public Floor(params int[] elevatorPos)
     {
         Elevators.AddRange(elevatorPos);
     }
@@ -475,7 +475,7 @@ public class Clone
         Direction = direction;
     }
 
-    public int CloneFloor { get; private set; }
-    public int ClonePos { get; private set; }
-    public Direction Direction { get; private set; }
+    public int CloneFloor { get; }
+    public int ClonePos { get; }
+    public Direction Direction { get; }
 }
